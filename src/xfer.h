@@ -1,9 +1,12 @@
 #pragma once
 #include <Arduino.h>
 #include <LittleFS.h>
+#include <FS.h>
 #include "ble_bridge.h"
 #include <mbedtls/base64.h>
 #include <ArduinoJson.h>
+
+using fs::File;
 
 static File     _xFile;
 static uint32_t _xExpected = 0, _xWritten = 0;
@@ -72,7 +75,7 @@ const char* petName();
 void ownerSet(const char* name);
 const char* ownerName();
 #include "stats.h"
-#include <M5StickCPlus.h>
+#include "board_hw.h"
 
 inline bool xferCommand(JsonDocument& doc) {
   const char* cmd = doc["cmd"];
@@ -112,9 +115,9 @@ inline bool xferCommand(JsonDocument& doc) {
   if (strcmp(cmd, "status") == 0) {
     // Dump everything the info screens show. Manual printf rather than
     // ArduinoJson serialize — less heap churn, and the shape is fixed.
-    int vBat = (int)(M5.Axp.GetBatVoltage() * 1000);
-    int iBat = (int)M5.Axp.GetBatCurrent();
-    int vBus = (int)(M5.Axp.GetVBusVoltage() * 1000);
+    int vBat = boardBatteryMilliVolts();
+    int iBat = boardBatteryMilliAmps();
+    int vBus = boardUsbMilliVolts();
     int pct = (vBat - 3200) / 10;
     if (pct < 0) pct = 0; if (pct > 100) pct = 100;
     char b[320];
@@ -185,7 +188,10 @@ inline bool xferCommand(JsonDocument& doc) {
     return true;
   }
 
-  if (!_xActive) return strcmp(cmd, "permission") != 0;  // permission cmd is not ours
+  // Outside char transfer, only the cmds above are ours; anything else (including
+  // wrapped HUD lines like {"cmd":"snapshot",...}) must fall through so data.h can
+  // merge sessions/tokens. Older code returned true here and dropped snapshots.
+  if (!_xActive) return false;
 
   if (strcmp(cmd, "file") == 0) {
     const char* path = doc["path"];

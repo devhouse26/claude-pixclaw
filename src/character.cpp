@@ -1,6 +1,7 @@
 #include "character.h"
-#include <M5StickCPlus.h>
 #include <LittleFS.h>
+#include "board_hw.h"
+#include "board_config.h"
 #include <AnimatedGIF.h>
 #include <ArduinoJson.h>
 
@@ -40,10 +41,10 @@ static int         gifX = 0, gifY = 0, gifW = 0, gifH = 0;
 // Peek mode pins the GIF bottom to the info-panel top (y=70) so the pet
 // sits on the panel edge regardless of canvas height. Home mode centers
 // in the upper 140px. No padding assumed in the source art.
-static const int   PEEK_TOP = 70;
+static const int   PEEK_TOP = PEEK_TOP_UI();
 static bool        peekMode = false;
 // Draw target — defaults to the sprite; characterRenderTo() retargets to
-// M5.Lcd for the landscape clock (both inherit TFT_eSPI).
+// boardRawLcd() for the landscape clock (both inherit TFT_eSPI).
 static TFT_eSPI*   _tgt = &spr;
 // Peek mode renders at half scale (2:1 nearest-neighbor in gifDrawCb) so
 // the whole pet fits the 70px window instead of cropping the top.
@@ -51,7 +52,7 @@ static void gifPlace() {
   int outW = peekMode ? gifW / 2 : gifW;
   int outH = peekMode ? gifH / 2 : gifH;
   gifX = (spr.width() - outW) / 2;
-  gifY = peekMode ? (PEEK_TOP - outH) / 2 : (140 - outH) / 2;
+  gifY = peekMode ? (PEEK_TOP - outH) / 2 : (GIF_HOME_CENTER_Y() - outH) / 2;
 }
 static uint32_t    nextFrameAt = 0;
 static uint32_t    animPauseUntil = 0;

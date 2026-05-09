@@ -1,5 +1,10 @@
 #pragma once
 #include <stdint.h>
+#if defined(BOARD_XIAO_ST7735)
+#include <TFT_eSPI.h>
+#else
+#include <M5StickCPlus.h>
+#endif
 
 // Shared constants and helpers for buddy species files.
 // Each species file (src/buddies/<name>.cpp) includes this header

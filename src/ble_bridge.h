@@ -30,3 +30,7 @@ void bleClearBonds();
 size_t bleAvailable();
 int bleRead();
 size_t bleWrite(const uint8_t* data, size_t len);
+
+// Diagnostics (USB serial): bytes pushed from BLE RX writes, last activity ms.
+uint32_t bleBridgeRxBytesTotal(void);
+uint32_t bleBridgeLastRxMs(void);
