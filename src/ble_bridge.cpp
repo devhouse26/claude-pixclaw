@@ -63,6 +63,14 @@ class TxCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
+class CCCDCallbacks : public BLEDescriptorCallbacks {
+  void onWrite(BLEDescriptor* d) override {
+    uint8_t* v = d->getValue();
+    uint16_t val = v ? (v[0] | (v[1] << 8)) : 0;
+    Serial.printf("[ble] CCCD write val=0x%04x (notify=%d)\n", val, val & 1);
+  }
+};
+
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* s) override {
     connected = true;
@@ -124,8 +132,18 @@ void bleInit(const char* deviceName) {
   // Request the biggest MTU we can get. macOS negotiates to 185 typically.
   BLEDevice::setMTU(517);
 
-  BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);
+  // TODO: upgrade to MITM pairing (passkey display) once the Claude desktop
+  // supports it. Currently the desktop does Just Works — SC_MITM_BOND + IO_CAP_OUT
+  // demanded MITM-authenticated encryption the desktop never provides, so the
+  // ESP32-C3 GATT stack silently dropped every write. SC_BOND + IO_CAP_NONE gives
+  // Just Works pairing: encrypted + bonded but no MITM protection at pair time.
   BLEDevice::setSecurityCallbacks(new SecCallbacks());
+  BLESecurity* sec = new BLESecurity();
+  sec->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
+  sec->setCapability(ESP_IO_CAP_NONE);
+  sec->setKeySize(16);
+  sec->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+  sec->setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
 
   server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
@@ -136,29 +154,18 @@ void bleInit(const char* deviceName) {
     NUS_TX_UUID,
     BLECharacteristic::PROPERTY_NOTIFY
   );
-  txChar->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
   BLE2902* cccd = new BLE2902();
-  cccd->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
+  cccd->setCallbacks(new CCCDCallbacks());
   txChar->addDescriptor(cccd);
   txChar->setCallbacks(new TxCallbacks());
 
-  // Stock Nordic UART uses WRITE-with-response only. WRITE_NR + long JSON
-  // can stress prepare-write paths on some centrals; Claude sends multi-hundred-byte lines.
   rxChar = svc->createCharacteristic(
     NUS_RX_UUID,
-    BLECharacteristic::PROPERTY_WRITE
+    BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR
   );
-  rxChar->setAccessPermissions(ESP_GATT_PERM_WRITE_ENCRYPTED);
   rxChar->setCallbacks(new RxCallbacks());
 
   svc->start();
-
-  BLESecurity* sec = new BLESecurity();
-  sec->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_MITM_BOND);
-  sec->setCapability(ESP_IO_CAP_OUT);
-  sec->setKeySize(16);
-  sec->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
-  sec->setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
 
   BLEAdvertising* adv = BLEDevice::getAdvertising();
   adv->addServiceUUID(NUS_SERVICE_UUID);
