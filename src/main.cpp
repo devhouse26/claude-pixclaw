@@ -78,6 +78,12 @@ bool     swallowBtnA = false;
 bool     swallowBtnB = false;
 bool     buddyMode = false;
 bool     gifAvailable = false;
+
+// True when the HUD has real content (prompt or transcript lines) that should
+// take over the full screen — sprite is suppressed while this holds.
+static bool hudActive() {
+  return settings().hud && (tama.promptId[0] || tama.nLines > 0);
+}
 const uint8_t SPECIES_GIF = 0xFF;   // species NVS sentinel: use the installed GIF
 
 // Cycle GIF (if installed) → ASCII species 0..N-1 → GIF. Persisted to the
@@ -755,13 +761,14 @@ static uint8_t wrapInto(const char* in, char out[][24], uint8_t maxRows, uint8_t
 
 static void drawApproval() {
   const Palette& p = characterPalette();
-  const int AREA = 78;
-  spr.fillRect(0, H - AREA, W, AREA, p.bg);
-  spr.drawFastHLine(0, H - AREA, W, p.textDim);
+  const int AREA = hudActive() ? H : 78;
+  const int TOP  = H - AREA;
+  spr.fillRect(0, TOP, W, AREA, p.bg);
+  if (TOP > 0) spr.drawFastHLine(0, TOP, W, p.textDim);
 
   spr.setTextSize(1);
   spr.setTextColor(p.textDim, p.bg);
-  spr.setCursor(4, H - AREA + 4);
+  spr.setCursor(4, TOP + 4);
   uint32_t waited = (millis() - promptArrivedMs) / 1000;
   if (waited >= 10) spr.setTextColor(HOT, p.bg);
   spr.printf("approve? %lus", (unsigned long)waited);
@@ -770,17 +777,17 @@ static void drawApproval() {
   int toolLen = strlen(tama.promptTool);
   spr.setTextColor(p.text, p.bg);
   spr.setTextSize(toolLen <= 10 ? 2 : 1);
-  spr.setCursor(4, H - AREA + (toolLen <= 10 ? 14 : 18));
+  spr.setCursor(4, TOP + (toolLen <= 10 ? 14 : 18));
   spr.print(tama.promptTool);
   spr.setTextSize(1);
 
   // Hint wraps at ~21 chars to two lines under the tool name
   spr.setTextColor(p.textDim, p.bg);
   int hlen = strlen(tama.promptHint);
-  spr.setCursor(4, H - AREA + 34);
+  spr.setCursor(4, TOP + 34);
   spr.printf("%.21s", tama.promptHint);
   if (hlen > 21) {
-    spr.setCursor(4, H - AREA + 42);
+    spr.setCursor(4, TOP + 42);
     spr.printf("%.21s", tama.promptHint + 21);
   }
 
@@ -927,18 +934,20 @@ void drawPet() {
 void drawHUD() {
   if (tama.promptId[0]) { drawApproval(); return; }
   const Palette& p = characterPalette();
+  bool full = hudActive();
 #if defined(BOARD_DISPLAY_ONLY)
-  // 4 rows fit the 128px display; width capped to 20 so text stays on-screen
-  // (x=4 + 21×6 = 130px overflows 128px).
-  const int SHOW = 4, LH = 8, WIDTH = 20;
+  // Full-screen: fill all 128px (16 rows). Strip: 4 rows, width capped to 20
+  // so text stays on-screen (x=4 + 21×6 = 130px overflows 128px).
+  const int SHOW = full ? (H / 8) : 4, LH = 8, WIDTH = 20;
 #else
-  const int SHOW = 3, LH = 8, WIDTH = 21;
+  const int SHOW = full ? (H / 8) : 3, LH = 8, WIDTH = 21;
 #endif
-  const int AREA = SHOW * LH + 4;
-  spr.fillRect(0, H - AREA, W, AREA, p.bg);
+  const int AREA = full ? H : SHOW * LH + 4;
+  const int topY = full ? 0 : H - AREA;
+  spr.fillRect(0, topY, W, AREA, p.bg);
   spr.setTextSize(1);
 
-  const int textTop = H - AREA + 2;
+  const int textTop = topY + 2;
 
   if (tama.lineGen != lastLineGen) { msgScroll = 0; lastLineGen = tama.lineGen; wake(); }
 
@@ -1286,9 +1295,24 @@ void loop() {
   }
   lastPasskey = pk;
 
+  // When text owns the screen, invalidate sprite so it repaints immediately on return.
+  {
+    static bool prevHudActive = false;
+    bool nowHudActive = hudActive();
+    if (prevHudActive && !nowHudActive) {
+      characterInvalidate();
+      if (buddyMode) buddyInvalidate();
+    }
+    prevHudActive = nowHudActive;
+  }
+
   if (napping || screenOff || landscapeClock) {
     // skip sprite render — face-down, powered off, or landscape clock
     // (which draws direct-to-LCD below)
+  } else if (hudActive()) {
+    // Text owns the full screen — clear sprite background; drawHUD() fills it.
+    const Palette& p = characterPalette();
+    spr.fillSprite(p.bg);
   } else if (buddyMode) {
     buddyTick(activeState);
   } else if (characterLoaded()) {
