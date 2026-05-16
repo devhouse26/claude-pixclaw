@@ -927,42 +927,18 @@ void drawPet() {
 void drawHUD() {
   if (tama.promptId[0]) { drawApproval(); return; }
   const Palette& p = characterPalette();
-  const int SHOW = 3, LH = 8, WIDTH = 21;
 #if defined(BOARD_DISPLAY_ONLY)
-  // Extra row: BLE + session counts so the panel matches Hardware Buddy state.
-  const int STATUS_H = 10;
+  // 4 rows fit the 128px display; width capped to 20 so text stays on-screen
+  // (x=4 + 21×6 = 130px overflows 128px).
+  const int SHOW = 4, LH = 8, WIDTH = 20;
 #else
-  const int STATUS_H = 0;
+  const int SHOW = 3, LH = 8, WIDTH = 21;
 #endif
-  const int AREA = SHOW * LH + 4 + STATUS_H;
+  const int AREA = SHOW * LH + 4;
   spr.fillRect(0, H - AREA, W, AREA, p.bg);
   spr.setTextSize(1);
 
-#if defined(BOARD_DISPLAY_ONLY)
-  {
-    spr.setCursor(4, H - AREA + 2);
-    const char* link;
-    uint16_t fg = p.textDim;
-    if (!bleConnected()) {
-      link = "--";
-    } else if (!bleSecure()) {
-      link = "SEC";
-      fg = TFT_RED;
-    } else if (!tama.connected) {
-      link = "WT";
-      fg = p.text;
-    } else {
-      link = "OK";
-      fg = p.body;
-    }
-    spr.setTextColor(fg, p.bg);
-    spr.printf("%s R%u W%u T%u%c", link, (unsigned)tama.sessionsRunning,
-               (unsigned)tama.sessionsWaiting, (unsigned)tama.sessionsTotal,
-               dataRecentOutput() ? '*' : ' ');
-  }
-#endif
-
-  const int textTop = H - AREA + 2 + STATUS_H;
+  const int textTop = H - AREA + 2;
 
   if (tama.lineGen != lastLineGen) { msgScroll = 0; lastLineGen = tama.lineGen; wake(); }
 
