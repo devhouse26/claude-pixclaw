@@ -825,18 +825,69 @@ static void tinyHeart(int x, int y, bool filled, uint16_t col) {
 }
 
 static void drawPetStats(const Palette& p) {
-  const int TOP = 70;
+  const int TOP = PEEK_TOP_UI();
+  const int LH  = H * 20 / 240;
   spr.fillRect(0, TOP, W, H - TOP, p.bg);
   spr.setTextSize(1);
-  int y = TOP + 16;
+  int y = TOP + H * 16 / 240;
 
+#if defined(BOARD_DISPLAY_ONLY)
+  if (petPage == 0) {
+    y = (TOP + 12 + H) / 2 - LH - 8;
+    spr.setTextColor(p.textDim, p.bg);
+    spr.setCursor(6, y - 2); spr.print("mood");
+    uint8_t mood = statsMoodTier();
+    uint16_t moodCol = (mood >= 3) ? RED : (mood >= 2) ? HOT : p.textDim;
+    for (int i = 0; i < 4; i++) tinyHeart(54 + i * 16, y + 2, i < mood, moodCol);
+    y += LH;
+    spr.setCursor(6, y - 2); spr.print("fed");
+    uint8_t fed = statsFedProgress();
+    for (int i = 0; i < 10; i++) {
+      int px = 38 + i * 9;
+      if (i < fed) spr.fillCircle(px, y + 1, 2, p.body);
+      else spr.drawCircle(px, y + 1, 2, p.textDim);
+    }
+    y += LH;
+    spr.setCursor(6, y - 2); spr.print("energy");
+    uint8_t en = statsEnergyTier();
+    uint16_t enCol = (en >= 4) ? 0x07FF : (en >= 2) ? 0xFFE0 : HOT;
+    for (int i = 0; i < 5; i++) {
+      int px = 54 + i * 13;
+      if (i < en) spr.fillRect(px, y - 2, 9, 6, enCol);
+      else spr.drawRect(px, y - 2, 9, 6, p.textDim);
+    }
+  } else {
+    y = TOP + 19;
+    spr.fillRoundRect(6, y - 2, 42, 14, 3, p.body);
+    spr.setTextColor(p.bg, p.body);
+    spr.setCursor(11, y + 1); spr.printf("Lv %u", stats().level);
+    y += 16;  // clear 14px badge + 2px gap
+    const int SLH = 9;
+    spr.setTextColor(p.textDim, p.bg);
+    spr.setCursor(6, y);
+    spr.printf("approved %u", stats().approvals);
+    spr.setCursor(6, y + SLH);
+    spr.printf("denied   %u", stats().denials);
+    uint32_t nap = stats().napSeconds;
+    spr.setCursor(6, y + SLH * 2);
+    spr.printf("napped   %luh%02lum", nap/3600, (nap/60)%60);
+    auto tokFmt = [&](const char* label, uint32_t v, int yPx) {
+      spr.setCursor(6, yPx);
+      if (v >= 1000000)   spr.printf("%s%lu.%luM", label, v/1000000, (v/100000)%10);
+      else if (v >= 1000) spr.printf("%s%lu.%luK", label, v/1000, (v/100)%10);
+      else                spr.printf("%s%lu", label, v);
+    };
+    tokFmt("tokens   ", stats().tokens, y + SLH * 3);
+    tokFmt("today    ", tama.tokensToday, y + SLH * 4);
+  }
+#else
   spr.setTextColor(p.textDim, p.bg);
   spr.setCursor(6, y - 2); spr.print("mood");
   uint8_t mood = statsMoodTier();
   uint16_t moodCol = (mood >= 3) ? RED : (mood >= 2) ? HOT : p.textDim;
   for (int i = 0; i < 4; i++) tinyHeart(54 + i * 16, y + 2, i < mood, moodCol);
 
-  y += 20;
+  y += LH;
   spr.setCursor(6, y - 2); spr.print("fed");
   uint8_t fed = statsFedProgress();
   for (int i = 0; i < 10; i++) {
@@ -845,7 +896,7 @@ static void drawPetStats(const Palette& p) {
     else spr.drawCircle(px, y + 1, 2, p.textDim);
   }
 
-  y += 20;
+  y += LH;
   spr.setCursor(6, y - 2); spr.print("energy");
   uint8_t en = statsEnergyTier();
   uint16_t enCol = (en >= 4) ? 0x07FF : (en >= 2) ? 0xFFE0 : HOT;
@@ -855,19 +906,20 @@ static void drawPetStats(const Palette& p) {
     else spr.drawRect(px, y - 2, 9, 6, p.textDim);
   }
 
-  y += 24;
+  y += H * 24 / 240;
   spr.fillRoundRect(6, y - 2, 42, 14, 3, p.body);
   spr.setTextColor(p.bg, p.body);
   spr.setCursor(11, y + 1); spr.printf("Lv %u", stats().level);
 
-  y += 20;
+  y += LH;
+  const int SLH = H * 10 / 240;
   spr.setTextColor(p.textDim, p.bg);
   spr.setCursor(6, y);
   spr.printf("approved %u", stats().approvals);
-  spr.setCursor(6, y + 10);
+  spr.setCursor(6, y + SLH);
   spr.printf("denied   %u", stats().denials);
   uint32_t nap = stats().napSeconds;
-  spr.setCursor(6, y + 20);
+  spr.setCursor(6, y + SLH * 2);
   spr.printf("napped   %luh%02lum", nap/3600, (nap/60)%60);
   auto tokFmt = [&](const char* label, uint32_t v, int yPx) {
     spr.setCursor(6, yPx);
@@ -875,21 +927,22 @@ static void drawPetStats(const Palette& p) {
     else if (v >= 1000) spr.printf("%s%lu.%luK", label, v/1000, (v/100)%10);
     else                spr.printf("%s%lu", label, v);
   };
-  tokFmt("tokens   ", stats().tokens, y + 30);
-  tokFmt("today    ", tama.tokensToday, y + 40);
+  tokFmt("tokens   ", stats().tokens, y + SLH * 3);
+  tokFmt("today    ", tama.tokensToday, y + SLH * 4);
+#endif
 }
 
 static void drawPetHowTo(const Palette& p) {
-  const int TOP = 70;
+  const int TOP = PEEK_TOP_UI();
   spr.fillRect(0, TOP, W, H - TOP, p.bg);
   spr.setTextSize(1);
   int y = TOP + 2;
   auto ln = [&](uint16_t c, const char* s) {
-    spr.setTextColor(c, p.bg); spr.setCursor(6, y); spr.print(s); y += 9;
+    spr.setTextColor(c, p.bg); spr.setCursor(6, y); spr.print(s); y += H * 9 / 240;
   };
-  auto gap = [&]() { y += 4; };
+  auto gap = [&]() { y += H * 4 / 240; };
 
-  y += 12;  // room for the PET header drawn by drawPet()
+  y += H * 12 / 240;  // room for the PET header drawn by drawPet()
 
   ln(p.body,    "MOOD");
   ln(p.textDim, " approve fast = up");
@@ -912,34 +965,39 @@ static void drawPetHowTo(const Palette& p) {
 
 void drawPet() {
   const Palette& p = characterPalette();
-  int y = 70;
+  int y = PEEK_TOP_UI();
 
+#if defined(BOARD_DISPLAY_ONLY)
+  drawPetStats(p);
+#else
   if (petPage == 0) drawPetStats(p);
   else drawPetHowTo(p);
+#endif
 
   // Header on top of whichever page drew — title left, counter right
   spr.setTextSize(1);
   spr.setTextColor(p.text, p.bg);
-  spr.setCursor(4, y + 2);
+  spr.setCursor(4, y + 7);
   if (ownerName()[0]) {
     spr.printf("%s's %s", ownerName(), petName());
   } else {
     spr.print(petName());
   }
   spr.setTextColor(p.textDim, p.bg);
-  spr.setCursor(W - 28, y + 2);
+  spr.setCursor(W - 28, y + 7);
   spr.printf("%u/%u", petPage + 1, PET_PAGES);
 }
 
 void drawHUD() {
   if (tama.promptId[0]) { drawApproval(); return; }
   const Palette& p = characterPalette();
-  bool full = hudActive();
 #if defined(BOARD_DISPLAY_ONLY)
-  // Full-screen: fill all 128px (16 rows). Strip: 4 rows, width capped to 20
-  // so text stays on-screen (x=4 + 21×6 = 130px overflows 128px).
-  const int SHOW = full ? (H / 8) : 4, LH = 8, WIDTH = 20;
+  // Always bottom strip on display-only — pet + stats stay visible above.
+  // (Approval goes full-screen via drawApproval(), not here.)
+  bool full = false;
+  const int SHOW = 4, LH = 8, WIDTH = 20;
 #else
+  bool full = hudActive();
   const int SHOW = full ? (H / 8) : 3, LH = 8, WIDTH = 21;
 #endif
   const int AREA = full ? H : SHOW * LH + 4;
@@ -1309,10 +1367,12 @@ void loop() {
   if (napping || screenOff || landscapeClock) {
     // skip sprite render — face-down, powered off, or landscape clock
     // (which draws direct-to-LCD below)
+#if !defined(BOARD_DISPLAY_ONLY)
   } else if (hudActive()) {
     // Text owns the full screen — clear sprite background; drawHUD() fills it.
     const Palette& p = characterPalette();
     spr.fillSprite(p.bg);
+#endif
   } else if (buddyMode) {
     buddyTick(activeState);
   } else if (characterLoaded()) {
@@ -1346,7 +1406,15 @@ void loop() {
 #ifdef BOARD_DISPLAY_ONLY
   if (!screenOff) {
     if (blePasskey()) drawPasskey();
-    else if (settings().hud) drawHUD();
+    else {
+      static uint32_t lastFlipMs = 0;
+      uint32_t now = millis();
+      if ((int32_t)(now - lastFlipMs) >= 3000) {
+        petPage = (petPage + 1) % 2;
+        lastFlipMs = now;
+      }
+      drawPet();
+    }
     spr.pushSprite(0, 0);
   }
 #else

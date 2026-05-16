@@ -12,10 +12,9 @@ enum { B_SLEEP, B_IDLE, B_BUSY, B_ATTENTION, B_CELEBRATE, B_DIZZY, B_HEART };
 const int BUDDY_X_CENTER = DISPLAY_W / 2;
 const int BUDDY_CANVAS_W = DISPLAY_W;
 #if defined(BOARD_DISPLAY_ONLY)
-// XIAO 128×128: scale=2 always. 4-row HUD is 36px → 92px animation zone.
-// At scale=2: yBase = BUDDY_Y_BASE*2-14. Want body to fill y=12..91 (5×16px).
-// yBase=12 → BUDDY_Y_BASE=13. Overlay particles start at y=3*2=6px.
-const int BUDDY_Y_BASE    = 13;
+// XIAO 128×128: scale=1 (peek always). PEEK_TOP_UI=42 → buddy fills y=2..42.
+// 5 rows × 8px = 40px; BUDDY_Y_BASE=2 → last row ends at y=42.
+const int BUDDY_Y_BASE    = 6;
 const int BUDDY_Y_OVERLAY = 3;
 #else
 const int BUDDY_Y_BASE   = 30;
@@ -155,12 +154,7 @@ static uint8_t lastDrawnSpecies = 0xFF;
 void buddyInvalidate() { lastDrawnState = 0xFF; }
 
 void buddySetPeek(bool peek) {
-#if defined(BOARD_DISPLAY_ONLY)
-  uint8_t s = 2;  // always 2× on the square 128px XIAO display
-  (void)peek;
-#else
   uint8_t s = peek ? 1 : 2;
-#endif
   if (s == _scale) return;
   _scale = s;
   buddyInvalidate();
