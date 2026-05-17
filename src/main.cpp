@@ -1406,6 +1406,7 @@ void loop() {
 #ifdef BOARD_DISPLAY_ONLY
   if (!screenOff) {
     if (blePasskey()) drawPasskey();
+    else if (tama.promptId[0]) drawHUD();
     else {
       static uint32_t lastFlipMs = 0;
       uint32_t now = millis();

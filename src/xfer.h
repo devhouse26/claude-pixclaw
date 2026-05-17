@@ -141,6 +141,35 @@ inline bool xferCommand(JsonDocument& doc) {
     return true;
   }
 
+  if (strcmp(cmd, "screenshot") == 0) {
+    uint16_t* fb = (uint16_t*)spr.getPointer();
+    if (!fb) { _xAck("screenshot", false); return true; }
+    const int SW = DISPLAY_W, SH = DISPLAY_H;
+    char hdr[64];
+    int hlen = snprintf(hdr, sizeof(hdr),
+      "{\"ack\":\"screenshot\",\"ok\":true,\"w\":%d,\"h\":%d}\n", SW, SH);
+    Serial.write(hdr, hlen);
+    bleWrite((const uint8_t*)hdr, hlen);
+    // Send one row per line as base64-encoded RGB565
+    const int ROW_BYTES = SW * 2;
+    uint8_t b64buf[400];
+    size_t b64len;
+    char row[460];
+    for (int y = 0; y < SH; y++) {
+      mbedtls_base64_encode(b64buf, sizeof(b64buf), &b64len,
+                            (const uint8_t*)(fb + y * SW), ROW_BYTES);
+      int rlen = snprintf(row, sizeof(row),
+        "{\"ack\":\"scr_row\",\"y\":%d,\"d\":\"%.*s\"}\n",
+        y, (int)b64len, b64buf);
+      Serial.write(row, rlen);
+      bleWrite((const uint8_t*)row, rlen);
+    }
+    const char* done = "{\"ack\":\"scr_done\"}\n";
+    Serial.write(done, strlen(done));
+    bleWrite((const uint8_t*)done, strlen(done));
+    return true;
+  }
+
   if (strcmp(cmd, "char_begin") == 0) {
     const char* name = doc["name"] | "pet";
     _xTotal = doc["total"] | 0;

@@ -1,31 +1,42 @@
-# claude-desktop-buddy
+# claude-pixclaw
 
-Claude for macOS and Windows can connect Claude Cowork and Claude Code to
-maker devices over BLE, so developers and makers can build hardware that
-displays permission prompts, recent messages, and other interactions. We've
-been impressed by the creativity of the maker community around Claude -
-providing a lightweight, opt-in API is our way of making it easier to build
-fun little hardware devices that integrate with Claude.
+A fork of [claude-desktop-buddy](https://github.com/anthropics/claude-desktop-buddy) ported to the **Seeed XIAO ESP32-C3 + ST7735 128×128 display** — a smaller, cheaper, display-only desk companion for Claude.
+
+**[pixclaw.com](https://pixclaw.com)**
+
+Claude for macOS and Windows connects to maker devices over BLE, displaying
+permission prompts, recent messages, and live session state. This fork
+adapts that firmware for the XIAO form factor: a coin-sized ESP32-C3 board
+driving a 128×128 ST7735 SPI display with no onboard IMU or buttons.
 
 > **Building your own device?** You don't need any of the code here. See
 > **[REFERENCE.md](REFERENCE.md)** for the wire protocol: Nordic UART
 > Service UUIDs, JSON schemas, and the folder push transport.
 
-As an example, we built a desk pet on ESP32 that lives off permission
-approvals and interaction with Claude. It sleeps when nothing's happening,
-wakes when sessions start, gets visibly impatient when an approval prompt is
-waiting, and lets you approve or deny right from the device.
+The desk pet sleeps when nothing's happening, wakes when sessions start,
+gets visibly impatient when an approval prompt is waiting, and shows live
+stats across two auto-cycling pages sized for the 128×128 screen.
 
-<p align="center">
-  <img src="docs/device.jpg" alt="M5StickC Plus running the buddy firmware" width="500">
-</p>
+## How this differs from the original
+
+| | Original ([claude-desktop-buddy](https://github.com/anthropics/claude-desktop-buddy)) | This fork (claude-pixclaw) |
+|---|---|---|
+| **Board** | M5StickC Plus | Seeed XIAO ESP32-C3 |
+| **Display** | 135×240 ST7789 | 128×128 ST7735 |
+| **Input** | Hardware buttons (A/B/Power) | Display-only (no onboard buttons) |
+| **IMU** | MPU6886 (shake to dizzy) | Not used |
+| **Stats layout** | Single-page HUD | Two auto-cycling pages (3 s each) |
+| **Approval UI** | On-device approve/deny | Skipped (display-only gap) |
+
+All upstream BLE protocol, GIF character packs, and pet state logic are
+preserved. Only the board HAL and display layout have been customized.
 
 ## Hardware
 
-The firmware targets ESP32 with the Arduino framework. As written, it
-depends on the M5StickCPlus library for its display, IMU, and button
-drivers—so you'll need that board, or a fork that swaps those drivers for
-your own pin layout.
+The firmware targets the **Seeed XIAO ESP32-C3** with a 128×128 ST7735 SPI
+display, built with the Arduino framework via PlatformIO. The
+`[env:xiao]` build target compiles the display-only variant
+(`BOARD_XIAO_ST7735` / `BOARD_DISPLAY_ONLY`).
 
 ## Flashing
 
@@ -34,13 +45,13 @@ Install
 then:
 
 ```bash
-pio run -t upload
+pio run -e xiao -t upload
 ```
 
 If you're starting from a previously-flashed device, wipe it first:
 
 ```bash
-pio run -t erase && pio run -t upload
+pio run -e xiao -t erase && pio run -e xiao -t upload
 ```
 
 Once running, you can also wipe everything from the device itself: **hold A
